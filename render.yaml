@@ -1,0 +1,125 @@
+databases:
+  - name: temporal
+    databaseName: temporal
+    user: temporal
+    plan: standard
+  - name: temporal-visibility
+    databaseName: visibility
+    user: visibility
+    plan: standard
+
+services:
+  - type: web
+    name: temporal-all
+    autoDeploy: false
+    plan: Standard
+    env: docker
+    dockerfilePath: ./temporal-cluster/server/auto-setup/Dockerfile
+    envVars:
+      # TODO make not public?
+      - key: FRONTEND_GRPC_PORT
+        value: 10000
+      - key: SERVICES
+        value: frontend,matching,history,worker
+      - key: DYNAMIC_CONFIG_FILE_PATH
+        value: /etc/temporal/dynamicconfig.yaml
+      - key: SKIP_POSTGRES_DB_CREATION
+        value: true
+      - key: TEMPORAL_CLI_ADDRESS
+        fromService:
+          name: temporal-all
+          type: web
+          property: hostport
+      - key: DB
+        value: postgresql
+      - key: DBNAME
+        fromDatabase:
+          name: temporal
+          property: database
+      - key: DB_PORT
+        fromDatabase:
+          name: temporal
+          property: port
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: temporal
+          property: user
+      - key: POSTGRES_PWD
+        fromDatabase:
+          name: temporal
+          property: password
+      - key: POSTGRES_SEEDS
+        fromDatabase:
+          name: temporal
+          property: host
+      - key: VISIBILITY_DBNAME
+        fromDatabase:
+          name: temporal-visibility
+          property: database
+      - key: VISIBILITY_DB_PORT
+        fromDatabase:
+          name: temporal-visibility
+          property: port
+      - key: VISIBILITY_POSTGRES_USER
+        fromDatabase:
+          name: temporal-visibility
+          property: user
+      - key: VISIBILITY_POSTGRES_PWD
+        fromDatabase:
+          name: temporal-visibility
+          property: password
+      - key: VISIBILITY_POSTGRES_SEEDS
+        fromDatabase:
+          name: temporal-visibility
+          property: host
+  # TODO get rid?
+  - type: worker
+    name: temporal-admin-tools
+    autoDeploy: false
+    plan: Standard
+    env: docker
+    dockerfilePath: ./temporal-cluster/admin-tools/Dockerfile
+    envVars:
+      - key: TEMPORAL_CLI_ADDRESS
+        fromService:
+          name: temporal-all
+          type: web
+          property: hostport
+  - type: web
+    name: temporal-ui
+    autoDeploy: false
+    plan: Standard
+    env: docker
+    dockerfilePath: ./temporal-cluster/web/Dockerfile
+    envVars:
+      - key: PORT
+        value: 8088
+      - key: TEMPORAL_PERMIT_WRITE_API
+        value: true
+      - key: TEMPORAL_GRPC_ENDPOINT
+        fromService:
+          name: temporal-all
+          type: web
+          property: hostport
+  - type: web
+    name: app-workflow-trigger
+    env: node
+    buildCommand: yarn; yarn run build
+    startCommand: yarn run start
+    envVars:
+      - key: TEMPORAL_CLUSTER_HOSTPORT
+        fromService:
+          name: temporal-all
+          type: web
+          property: hostport
+  - type: worker
+    name: app-worker
+    env: node
+    buildCommand: yarn
+    startCommand: yarn run start.worker
+    envVars:
+      - key: TEMPORAL_CLUSTER_HOSTPORT
+        fromService:
+          name: temporal-all
+          type: web
+          property: hostport
