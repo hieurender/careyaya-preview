@@ -9,6 +9,31 @@ databases:
     plan: standard
 
 services:
+  - type: pserv
+    name: temporal-elasticsearch
+    autoDeploy: false
+    plan: Standard
+    env: docker
+    dockerfilePath: ./temporal-cluster/elasticsearch/Dockerfile
+    envVars:
+      - key: PORT
+        value: 9200
+      - key: ES_JAVA_OPTS
+        value: "-Xms100m -Xmx100m"
+      - key: xpack.security.enabled
+        value: true
+      - key: ELASTIC_PASSWORD
+        generateValue: true
+      - key: cluster.routing.allocation.disk.threshold_enabled
+        value: true
+      - key: cluster.routing.allocation.disk.watermark.low
+        value: 512mb
+      - key: cluster.routing.allocation.disk.watermark.high
+        value: 256mb
+      - key: cluster.routing.allocation.disk.watermark.flood_stage
+        value: 128mb
+      - key: discovery.type
+        value: single-node
   - type: web
     name: temporal-all
     autoDeploy: false
@@ -21,7 +46,7 @@ services:
       - key: SERVICES
         value: frontend,matching,history,worker
       - key: DYNAMIC_CONFIG_FILE_PATH
-        value: /etc/temporal/dynamicconfig.yaml
+        value: /etc/temporal/dynamicconfig_es.yaml
       - key: SKIP_POSTGRES_DB_CREATION
         value: true
       - key: TEMPORAL_CLI_ADDRESS
@@ -29,6 +54,22 @@ services:
           name: temporal-all
           type: web
           property: hostport
+      - key: ENABLE_ES
+        value: true
+      - key: ES_VERSION
+        value: v7
+      - key: ES_USER
+        value: elastic
+      - key: ES_PWD
+        fromService:
+          name: temporal-elasticsearch
+          type: pserv
+          envVarKey: ELASTIC_PASSWORD
+      - key: ES_SEEDS
+        fromService:
+          name: temporal-elasticsearch
+          type: pserv
+          property: host
       - key: DB
         value: postgresql
       - key: DBNAME
